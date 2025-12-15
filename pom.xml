@@ -106,8 +106,8 @@
 
     <distributionManagement>
     <repository>
-        <id>artifactory-release</id>
-        <url>https://trial5wytp0.jfrog.io/artifactory/adi-libs-release-local</url>
+        <id>dev</id>
+        <url>file://jarstaging</url>
     </repository>
 </distributionManagement>
 </project>
