@@ -1,28 +1,32 @@
-// Define the URL of the Artifactory registry
-def registry = 'https://trial5wytp0.jfrog.io/'
+def registry = 'https://trial5wytp0.jfrog.io'
 
 pipeline {
     agent any
 
-    environment {
-        PATH = "/opt/maven/bin:$PATH"
+    tools {
+        maven 'maven'   // use configured Maven tool if available
     }
 
     stages {
 
-        stage("build") {
+        stage('Clean Workspace') {
+            steps {
+                cleanWs()
+            }
+        }
+
+        stage("Build") {
             steps {
                 echo "----------- build started ----------"
-                sh 'mvn clean deploy -Dmaven.test.skip=true'
+                sh 'mvn clean deploy -DskipTests'
                 echo "----------- build completed ----------"
             }
         }
 
-        stage("test") {
+        stage("Test Report") {
             steps {
-                echo "----------- unit test started ----------"
+                echo "----------- unit test report ----------"
                 sh 'mvn surefire-report:report'
-                echo "----------- unit test completed ----------"
             }
         }
 
@@ -30,7 +34,6 @@ pipeline {
             environment {
                 scannerHome = tool 'saidemy-soanr-scanner'
             }
-
             steps {
                 withSonarQubeEnv('Saidemy-sonarqube-server') {
                     sh "${scannerHome}/bin/sonar-scanner"
@@ -38,30 +41,21 @@ pipeline {
             }
         }
 
-        stage("Jar Publish") {
+        stage("Publish Build Info") {
             steps {
                 script {
-                    echo '<--------------- Jar Publish Started --------------->'
-                    def server = Artifactory.newServer url: registry + "/artifactory", credentialsId: "artifact-cred"
-                    def properties = "buildid=${env.BUILD_ID},commitid=${GIT_COMMIT}"
-                    def uploadSpec = """{
-                          "files": [
-                            {
-                              "pattern": "jarstaging/(*)",
-                              "target": "adi-libs-snapshot-local/{1}",
-                              "flat": "false",
-                              "props": "${properties}",
-                              "exclusions": [ "*.sha1", "*.md5"]
-                            }
-                         ]
-                     }"""
-                    def buildInfo = server.upload(uploadSpec)
-                    buildInfo.env.collect()
+                    echo '<--------------- Build Info Publish Started --------------->'
+                    def server = Artifactory.newServer(
+                        url: registry + '/artifactory',
+                        credentialsId: 'artifact-cred'
+                    )
+                    def buildInfo = Artifactory.newBuildInfo()
+                    buildInfo.env.capture = true
                     server.publishBuildInfo(buildInfo)
-                    echo '<--------------- Jar Publish Ended --------------->'
+                    echo '<--------------- Build Info Publish Ended --------------->'
                 }
             }
         }
-
     }
-}          
+}
+
